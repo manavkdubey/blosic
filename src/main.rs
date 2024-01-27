@@ -1,5 +1,8 @@
-//"MTE2ODU3NzA0NDI5NzI4OTc1MA.GEU-kC.OFajL61XhAkhG13ka0H_LHenypMJFLWUZbALoY"
+use hyper::{header, Body, Client as Client1, Request};
+use hyper_tls::HttpsConnector;
 use poise::serenity_prelude::GatewayIntents;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use serenity::{
     async_trait,
     client::{Client, Context, EventHandler},
@@ -10,11 +13,26 @@ use serenity::{
     model::{channel::Message, gateway::Ready},
 };
 use songbird::SerenityInit;
+use std::env;
 
 #[group]
-#[commands(join, leave, play, stop)]
+#[commands(join, leave, play, stop, ask)]
 struct General;
+#[derive(Deserialize)]
+struct OpenAIResponse {
+    choices: Vec<Choice>,
+}
 
+#[derive(Deserialize)]
+struct Choice {
+    message: MessageContent,
+}
+
+#[derive(Deserialize)]
+struct MessageContent {
+    role: String,
+    content: String,
+}
 struct Handler;
 
 #[async_trait]
@@ -23,6 +41,48 @@ impl EventHandler for Handler {
         println!("Bot is ready with username {}", ready.user.name);
     }
 }
+
+#[command]
+async fn ask(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let user_input = args.rest();
+
+    let oai_token = "your_open_ai_api_key"; // Use an environment variable or another secure method to store this
+    let prompt = user_input.to_string();
+
+    let oai_request = json!({
+        "model": "gpt-3.5-turbo",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 100
+    });
+
+    let client = Client1::builder().build::<_, hyper::Body>(HttpsConnector::new());
+
+    let req = Request::post("https://api.openai.com/v1/chat/completions")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("Authorization", format!("Bearer {}", oai_token))
+        .body(Body::from(oai_request.to_string()))
+        .expect("Failed to build request");
+
+    let res = client.request(req).await.expect("Request failed");
+    let body = hyper::body::to_bytes(res.into_body())
+        .await
+        .expect("Failed to read response body");
+
+    let response: OpenAIResponse = serde_json::from_slice(&body).expect("Failed to parse response");
+
+    if let Some(choice) = response.choices.get(0) {
+        msg.channel_id
+            .say(&ctx.http, &choice.message.content)
+            .await?;
+    } else {
+        msg.channel_id
+            .say(&ctx.http, "No response received.")
+            .await?;
+    }
+
+    Ok(())
+}
+
 #[command]
 async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
     let guild = msg.guild(&ctx.cache).unwrap();
@@ -143,7 +203,7 @@ async fn leave(ctx: &Context, msg: &Message, mut _args: Args) -> CommandResult {
 
 #[tokio::main]
 async fn main() {
-    let token = "MTE2ODU3NzA0NDI5NzI4OTc1MA.GEU-kC.OFajL61XhAkhG13ka0H_LHenypMJFLWUZbALoY";
+    let token = "YOUR_DISCORD_BOT_TOKEN";
 
     let framework = StandardFramework::new()
         .configure(|c| c.prefix("~"))

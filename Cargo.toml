@@ -12,3 +12,11 @@ reqwest = "0.11.22"
 serenity = "0.11.7"
 songbird = "0.3.2"
 tokio = { version = "1.33.0", features = ["full", "rt-multi-thread"] }
+serde_json = "1.0.112"
+serde = "1.0.196"
+hyper = { version = "^0.14", features = ["full"] } # A fast and correct HTTP implementation for Rust.
+hyper-tls = "^0.5" # Provides an HTTPS connector for use with hyper.
+serde_derive = "^1.0" # A macro for deriving serde::Serialize and serde::Deserialize (logic for structs).spinners = "^2.0" # For displaying a spinner while waiting for a response from the API.
+dotenv = "0.15.0" # For loading environment variables from a .env file.
+
+
